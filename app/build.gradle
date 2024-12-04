@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.vladimirvshivkov.AdaptPeak'
+    namespace 'com.vladimirvshivkov.adaptpeak'
     compileSdk 35
     defaultConfig {
-        applicationId "com.vladimirvshivkov.AdaptPeak"
-        minSdk 24
+        applicationId "com.vladimirvshivkov.adaptpeak"
+        minSdk 31
         targetSdk 33
         versionCode 1
         versionName "1.0"

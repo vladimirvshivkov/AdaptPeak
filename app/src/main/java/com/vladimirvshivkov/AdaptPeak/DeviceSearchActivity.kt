@@ -1,4 +1,4 @@
-package com.vladimirvshivkov.AdaptPeak
+package com.vladimirvshivkov.adaptpeak
 
 import android.Manifest
 import android.bluetooth.BluetoothAdapter

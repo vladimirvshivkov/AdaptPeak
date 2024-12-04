@@ -1,4 +1,4 @@
-package com.vladimirvshivkov.AdaptPeak
+package com.vladimirvshivkov.adaptpeak
 
 import java.util.UUID
 import android.Manifest
@@ -16,6 +16,7 @@ import com.polar.sdk.api.PolarBleApiDefaultImpl.defaultImplementation
 import com.polar.sdk.api.errors.PolarInvalidArgument
 import com.polar.sdk.api.model.PolarDeviceInfo
 import com.polar.sdk.api.model.PolarHrData
+import com.vladimirvshivkov.adaptpeak.R
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
 
@@ -31,6 +32,8 @@ class HRActivity : AppCompatActivity() {
     private lateinit var textViewDeviceId: TextView
     private lateinit var deviceId: String
     private var hrDisposable: Disposable? = null
+    private var isDeviceConnected = false
+    private lateinit var plotter: HrAndRrPlotter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,6 +42,7 @@ class HRActivity : AppCompatActivity() {
         textViewHR = findViewById(R.id.hr_value_label)
         textViewRR = findViewById(R.id.rr_value_label)
         textViewDeviceId = findViewById(R.id.device_id_label)
+        plotter = HrAndRrPlotter()
 
         api = defaultImplementation(
             applicationContext,
@@ -56,7 +60,11 @@ class HRActivity : AppCompatActivity() {
 
             override fun deviceConnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d(TAG, "Device connected ${polarDeviceInfo.deviceId}")
-                Toast.makeText(applicationContext, R.string.connected, Toast.LENGTH_SHORT).show()
+                runOnUiThread {
+                    Toast.makeText(applicationContext, R.string.connected, Toast.LENGTH_SHORT).show()
+                    isDeviceConnected = true
+                    streamHRData() // Start streaming when connected
+                }
             }
 
             override fun deviceConnecting(polarDeviceInfo: PolarDeviceInfo) {
@@ -65,13 +73,20 @@ class HRActivity : AppCompatActivity() {
 
             override fun deviceDisconnected(polarDeviceInfo: PolarDeviceInfo) {
                 Log.d(TAG, "Device disconnected ${polarDeviceInfo.deviceId}")
+                runOnUiThread {
+                    isDeviceConnected = false
+                    hrDisposable?.dispose()
+                    hrDisposable = null
+                    textViewHR.text = "Heart Rate: -- bpm"
+                    textViewRR.text = "HRV: -- ms"
+                }
             }
 
             override fun disInformationReceived(
                 identifier: String,
                 disInfo: DisInfo
             ) {
-                TODO("Not yet implemented")
+                Log.d(TAG, "Dis information received: $identifier")
             }
 
             override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
@@ -132,19 +147,29 @@ class HRActivity : AppCompatActivity() {
 
     private fun connectToDeviceAndStreamData() {
         try {
+            Log.d(TAG, "Attempting to connect to device: $deviceId")
             api.connectToDevice(deviceId)
+            streamHRData() // Start streaming after connection attempt
         } catch (polarInvalidArgument: PolarInvalidArgument) {
             Log.e(TAG, "Failed to connect. Reason $polarInvalidArgument")
+            Toast.makeText(this, "Failed to connect: ${polarInvalidArgument.message}", Toast.LENGTH_LONG).show()
         }
     }
 
     private fun streamHRData() {
+        if (!isDeviceConnected) {
+            Log.d(TAG, "Cannot stream, device not connected")
+            return
+        }
+
         val isDisposed = hrDisposable?.isDisposed ?: true
         if (isDisposed) {
+            Log.d(TAG, "Starting HR stream for device: $deviceId")
             hrDisposable = api.startHrStreaming(deviceId)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
                     { polarHrData: PolarHrData ->
+                        Log.d(TAG, "HR data received: ${polarHrData.samples.firstOrNull()?.hr ?: "no samples"}")
                         for (sample in polarHrData.samples) {
                             val hrText = "Heart Rate: ${sample.hr} bpm"
                             textViewHR.text = hrText
@@ -153,18 +178,25 @@ class HRActivity : AppCompatActivity() {
                                 val hrvText = "HRV (rMSSD): ${sample.rrsMs.average()} ms"
                                 textViewRR.text = hrvText
                             }
+                            plotter.addValues(sample)
                         }
                     },
                     { error: Throwable ->
                         val errorString = "HR stream failed: $error"
                         Log.e(TAG, errorString)
-                        Toast.makeText(applicationContext, errorString, Toast.LENGTH_LONG).show()
+                        runOnUiThread {
+                            Toast.makeText(applicationContext, errorString, Toast.LENGTH_LONG).show()
+                        }
                     },
-                    { Log.d(TAG, "HR stream complete") }
+                    {
+                        Log.d(TAG, "HR stream complete")
+                        runOnUiThread {
+                            Toast.makeText(applicationContext, "HR stream completed", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 )
         } else {
-            hrDisposable?.dispose()
-            hrDisposable = null
+            Log.d(TAG, "HR stream already active")
         }
     }
 }

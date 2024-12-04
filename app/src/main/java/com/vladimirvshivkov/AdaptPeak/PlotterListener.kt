@@ -1,4 +1,4 @@
-package com.vladimirvshivkov.AdaptPeak
+package com.vladimirvshivkov.adaptpeak
 
 interface PlotterListener {
     fun update()

@@ -1,4 +1,4 @@
-package com.vladimirvshivkov.AdaptPeak
+package com.vladimirvshivkov.adaptpeak
 
 import android.graphics.Color
 import com.androidplot.xy.LineAndPointFormatter
@@ -41,10 +41,10 @@ class HrAndRrPlotter {
             yRrVals[i] = 100.0
         }
         hrFormatter = LineAndPointFormatter(Color.RED, null, null, null)
-        hrFormatter.setLegendIconEnabled(false)
+        hrFormatter.isLegendIconEnabled = false
         hrSeries = SimpleXYSeries(xHrVals, yHrVals, "HR")
         rrFormatter = LineAndPointFormatter(Color.BLUE, null, null, null)
-        rrFormatter.setLegendIconEnabled(false)
+        rrFormatter.isLegendIconEnabled = false
         rrSeries = SimpleXYSeries(xRrVals, yRrVals, "RR")
     }
 

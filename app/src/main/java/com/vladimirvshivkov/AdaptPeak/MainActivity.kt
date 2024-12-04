@@ -1,7 +1,6 @@
-package com.vladimirvshivkov.AdaptPeak
+package com.vladimirvshivkov.adaptpeak
 
 import android.Manifest
-import android.app.Activity
 import android.bluetooth.*
 import android.content.DialogInterface
 import android.content.Intent
@@ -22,6 +21,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import com.vladimirvshivkov.adaptpeak.R
 
 class MainActivity : AppCompatActivity() {
     companion object {
