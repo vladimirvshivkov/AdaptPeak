@@ -1,14 +1,15 @@
 package com.vladimirvshivkov.AdaptPeak
 
+import java.util.UUID
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.androidplot.xy.BoundaryMode
-import com.androidplot.xy.StepMode
-import com.androidplot.xy.XYGraphWidget
-import com.androidplot.xy.XYPlot
+import androidx.core.app.ActivityCompat
+import com.polar.androidcommunications.api.ble.model.DisInfo
 import com.polar.sdk.api.PolarBleApi
 import com.polar.sdk.api.PolarBleApiCallback
 import com.polar.sdk.api.PolarBleApiDefaultImpl.defaultImplementation
@@ -17,36 +18,27 @@ import com.polar.sdk.api.model.PolarDeviceInfo
 import com.polar.sdk.api.model.PolarHrData
 import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers
 import io.reactivex.rxjava3.disposables.Disposable
-import java.text.DecimalFormat
-import java.util.*
 
-class HRActivity : AppCompatActivity(), PlotterListener {
+class HRActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "HRActivity"
+        private const val PERMISSION_REQUEST_CODE = 1
     }
 
     private lateinit var api: PolarBleApi
-    private lateinit var plotter: HrAndRrPlotter
     private lateinit var textViewHR: TextView
     private lateinit var textViewRR: TextView
     private lateinit var textViewDeviceId: TextView
-    private lateinit var textViewBattery: TextView
-    private lateinit var textViewFwVersion: TextView
-    private lateinit var plot: XYPlot
-    private var hrDisposable: Disposable? = null
-
     private lateinit var deviceId: String
+    private var hrDisposable: Disposable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_hr)
         deviceId = intent.getStringExtra("id") ?: throw Exception("HRActivity couldn't be created, no deviceId given")
-        textViewHR = findViewById(R.id.hr_view_hr)
-        textViewRR = findViewById(R.id.hr_view_rr)
-        textViewDeviceId = findViewById(R.id.hr_view_deviceId)
-        textViewBattery = findViewById(R.id.hr_view_battery_level)
-        textViewFwVersion = findViewById(R.id.hr_view_fw_version)
-        plot = findViewById(R.id.hr_view_plot)
+        textViewHR = findViewById(R.id.hr_value_label)
+        textViewRR = findViewById(R.id.rr_value_label)
+        textViewDeviceId = findViewById(R.id.device_id_label)
 
         api = defaultImplementation(
             applicationContext,
@@ -56,7 +48,7 @@ class HRActivity : AppCompatActivity(), PlotterListener {
                 PolarBleApi.PolarBleSdkFeature.FEATURE_DEVICE_INFO
             )
         )
-        api.setApiLogger { str: String -> Log.d("SDK", str) }
+
         api.setApiCallback(object : PolarBleApiCallback() {
             override fun blePowerStateChanged(powered: Boolean) {
                 Log.d(TAG, "BluetoothStateChanged $powered")
@@ -75,108 +67,102 @@ class HRActivity : AppCompatActivity(), PlotterListener {
                 Log.d(TAG, "Device disconnected ${polarDeviceInfo.deviceId}")
             }
 
-            override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
-                Log.d(TAG, "feature ready $feature")
+            override fun disInformationReceived(
+                identifier: String,
+                disInfo: DisInfo
+            ) {
+                TODO("Not yet implemented")
+            }
 
-                when (feature) {
-                    PolarBleApi.PolarBleSdkFeature.FEATURE_POLAR_ONLINE_STREAMING -> {
-                        streamHR()
-                    }
-                    else -> {}
+            override fun bleSdkFeatureReady(identifier: String, feature: PolarBleApi.PolarBleSdkFeature) {
+                Log.d(TAG, "Feature ready $feature")
+                if (feature == PolarBleApi.PolarBleSdkFeature.FEATURE_POLAR_ONLINE_STREAMING) {
+                    checkPermissionsAndStreamData()
                 }
             }
 
             override fun disInformationReceived(identifier: String, uuid: UUID, value: String) {
-                if (uuid == UUID.fromString("00002a28-0000-1000-8000-00805f9b34fb")) {
-                    val msg = "Firmware: " + value.trim { it <= ' ' }
-                    Log.d(TAG, "Firmware: " + identifier + " " + value.trim { it <= ' ' })
-                    textViewFwVersion.append(msg.trimIndent())
-                }
-            }
-
-            override fun batteryLevelReceived(identifier: String, level: Int) {
-                Log.d(TAG, "Battery level $identifier $level%")
-                val batteryLevelText = "Battery level: $level%"
-                textViewBattery.append(batteryLevelText)
+                Log.d(TAG, "Dis information received: $identifier $uuid $value")
             }
 
             override fun hrNotificationReceived(identifier: String, data: PolarHrData.PolarHrSample) {
-                //deprecated
+                // Deprecated
+            }
+
+            override fun batteryLevelReceived(identifier: String, level: Int) {
+                // No operation
             }
 
             override fun polarFtpFeatureReady(identifier: String) {
-                //deprecated
-            }
-
-            override fun streamingFeaturesReady(identifier: String, features: Set<PolarBleApi.PolarDeviceDataType>) {
-                //deprecated
-            }
-
-            override fun hrFeatureReady(identifier: String) {
-                //deprecated
+                // No operation
             }
         })
 
-        try {
-            api.connectToDevice(deviceId)
-        } catch (a: PolarInvalidArgument) {
-            a.printStackTrace()
-        }
-
-        val deviceIdText = "ID: $deviceId"
-        textViewDeviceId.text = deviceIdText
-
-        plotter = HrAndRrPlotter()
-        plotter.setListener(this)
-        plot.addSeries(plotter.hrSeries, plotter.hrFormatter)
-        plot.addSeries(plotter.rrSeries, plotter.rrFormatter)
-        plot.setRangeBoundaries(50, 100, BoundaryMode.AUTO)
-        plot.setDomainBoundaries(0, 360000, BoundaryMode.AUTO)
-        // Left labels will increment by 10
-        plot.setRangeStep(StepMode.INCREMENT_BY_VAL, 10.0)
-        plot.setDomainStep(StepMode.INCREMENT_BY_VAL, 60000.0)
-        // Make left labels be an integer (no decimal places)
-        plot.graph.getLineLabelStyle(XYGraphWidget.Edge.LEFT).format = DecimalFormat("#")
-        // These don't seem to have an effect
-        plot.linesPerRangeLabel = 2
+        textViewDeviceId.text = deviceId
     }
 
-    public override fun onDestroy() {
+    override fun onDestroy() {
         super.onDestroy()
+        hrDisposable?.let {
+            if (!it.isDisposed) {
+                it.dispose()
+            }
+        }
         api.shutDown()
     }
 
-    override fun update() {
-        runOnUiThread { plot.redraw() }
+    private fun checkPermissionsAndStreamData() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.BLUETOOTH_SCAN), PERMISSION_REQUEST_CODE)
+        } else {
+            connectToDeviceAndStreamData()
+        }
     }
 
-    fun streamHR() {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                connectToDeviceAndStreamData()
+            } else {
+                Toast.makeText(this, "Bluetooth permission denied. Cannot connect to the device.", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun connectToDeviceAndStreamData() {
+        try {
+            api.connectToDevice(deviceId)
+        } catch (polarInvalidArgument: PolarInvalidArgument) {
+            Log.e(TAG, "Failed to connect. Reason $polarInvalidArgument")
+        }
+    }
+
+    private fun streamHRData() {
         val isDisposed = hrDisposable?.isDisposed ?: true
         if (isDisposed) {
             hrDisposable = api.startHrStreaming(deviceId)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(
-                    { hrData: PolarHrData ->
-                        for (sample in hrData.samples) {
-                            Log.d(TAG, "HR ${sample.hr} RR ${sample.rrsMs}")
+                    { polarHrData: PolarHrData ->
+                        for (sample in polarHrData.samples) {
+                            val hrText = "Heart Rate: ${sample.hr} bpm"
+                            textViewHR.text = hrText
 
                             if (sample.rrsMs.isNotEmpty()) {
-                                val rrText = "(${sample.rrsMs.joinToString(separator = "ms, ")}ms)"
-                                textViewRR.text = rrText
+                                val hrvText = "HRV (rMSSD): ${sample.rrsMs.average()} ms"
+                                textViewRR.text = hrvText
                             }
-                            textViewHR.text = sample.hr.toString()
-                            plotter.addValues(sample)
-
                         }
                     },
                     { error: Throwable ->
-                        Log.e(TAG, "HR stream failed. Reason $error")
-                        hrDisposable = null
+                        val errorString = "HR stream failed: $error"
+                        Log.e(TAG, errorString)
+                        Toast.makeText(applicationContext, errorString, Toast.LENGTH_LONG).show()
                     },
                     { Log.d(TAG, "HR stream complete") }
                 )
         } else {
-            // NOTE stops streaming if it is "running"
             hrDisposable?.dispose()
             hrDisposable = null
         }

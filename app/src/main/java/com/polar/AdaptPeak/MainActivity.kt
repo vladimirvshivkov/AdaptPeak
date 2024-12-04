@@ -2,8 +2,7 @@ package com.vladimirvshivkov.AdaptPeak
 
 import android.Manifest
 import android.app.Activity
-import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothManager
+import android.bluetooth.*
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.SharedPreferences
@@ -22,17 +21,19 @@ import androidx.activity.result.ActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 
 class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "Polar_MainActivity"
         private const val SHARED_PREFS_KEY = "polar_device_id"
-        private const val PERMISSION_REQUEST_CODE = 1
+        private const val PERMISSION_REQUEST_CODE = 100
+        private const val REQUEST_DEVICE_SEARCH = 101
     }
 
     private lateinit var sharedPreferences: SharedPreferences
     private val bluetoothOnActivityResultLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result: ActivityResult ->
-        if (result.resultCode != Activity.RESULT_OK) {
+        if (result.resultCode != RESULT_OK) {
             Log.w(TAG, "Bluetooth off")
         }
     }
@@ -44,27 +45,12 @@ class MainActivity : AppCompatActivity() {
         sharedPreferences = getPreferences(MODE_PRIVATE)
         deviceId = sharedPreferences.getString(SHARED_PREFS_KEY, "")
 
-        val setIdButton: Button = findViewById(R.id.buttonSetID)
-        val ecgConnectButton: Button = findViewById(R.id.buttonConnectEcg)
         val hrConnectButton: Button = findViewById(R.id.buttonConnectHr)
+        val searchDevicesButton: Button = findViewById(R.id.buttonSearchDevices)
         checkBT()
 
-        setIdButton.setOnClickListener { onClickChangeID(it) }
-        ecgConnectButton.setOnClickListener { onClickConnectEcg(it) }
         hrConnectButton.setOnClickListener { onClickConnectHr(it) }
-    }
-
-    private fun onClickConnectEcg(view: View) {
-        checkBT()
-        if (deviceId == null || deviceId == "") {
-            deviceId = sharedPreferences.getString(SHARED_PREFS_KEY, "")
-            showDialog(view)
-        } else {
-            showToast(getString(R.string.connecting) + " " + deviceId)
-            val intent = Intent(this, ECGActivity::class.java)
-            intent.putExtra("id", deviceId)
-            startActivity(intent)
-        }
+        searchDevicesButton.setOnClickListener { onClickSearchDevices() }
     }
 
     private fun onClickConnectHr(view: View) {
@@ -80,8 +66,62 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun onClickChangeID(view: View) {
-        showDialog(view)
+    private val deviceSearchLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val deviceAddress = result.data?.getStringExtra("device_address")
+            deviceId = deviceAddress
+            val editor = sharedPreferences.edit()
+            editor.putString(SHARED_PREFS_KEY, deviceId)
+            editor.apply()
+            showToast("Device selected: $deviceId")
+        }
+    }
+
+    private fun onClickSearchDevices() {
+        if (checkAndRequestPermissions()) {
+            val intent = Intent(this, DeviceSearchActivity::class.java)
+            deviceSearchLauncher.launch(intent)
+        }
+    }
+
+    private fun checkAndRequestPermissions(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_SCAN
+                ) != PackageManager.PERMISSION_GRANTED ||
+                ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.BLUETOOTH_CONNECT
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(
+                        Manifest.permission.BLUETOOTH_SCAN,
+                        Manifest.permission.BLUETOOTH_CONNECT
+                    ),
+                    PERMISSION_REQUEST_CODE
+                )
+                return false
+            }
+        } else {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                    PERMISSION_REQUEST_CODE
+                )
+                return false
+            }
+        }
+        return true
     }
 
     private fun showDialog(view: View) {
@@ -129,14 +169,25 @@ class MainActivity : AppCompatActivity() {
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            for (index in 0..grantResults.lastIndex) {
-                if (grantResults[index] == PackageManager.PERMISSION_DENIED) {
-                    Log.w(TAG, "Needed permissions are missing")
-                    showToast("Needed permissions are missing")
-                    return
-                }
+            if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                Log.d(TAG, "Needed permissions are granted")
+                onClickSearchDevices()
+            } else {
+                Log.w(TAG, "Needed permissions are missing")
+                showToast("Needed permissions are required to search for Bluetooth devices")
             }
-            Log.d(TAG, "Needed permissions are granted")
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_DEVICE_SEARCH && resultCode == RESULT_OK) {
+            val deviceAddress = data?.getStringExtra("device_address")
+            deviceId = deviceAddress
+            val editor = sharedPreferences.edit()
+            editor.putString(SHARED_PREFS_KEY, deviceId)
+            editor.apply()
+            showToast("Device selected: $deviceId")
         }
     }
 

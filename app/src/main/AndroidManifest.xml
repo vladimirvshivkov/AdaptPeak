@@ -51,11 +51,8 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".ECGActivity"
-            android:exported="false"
-            android:label="@string/ecg_name"
-            android:parentActivityName=".MainActivity"
-            android:screenOrientation="unspecified" />
+            android:name=".DeviceSearchActivity"
+            android:label="Search Devices" />
         <activity
             android:name=".HRActivity"
             android:exported="false"
