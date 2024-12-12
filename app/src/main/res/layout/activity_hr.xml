@@ -1,102 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
 
-    <LinearLayout
-        android:id="@+id/hr_view_heading"
-        android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/device_id_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content" />
+
+    <TextView
+        android:id="@+id/hr_value_label"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:orientation="vertical"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        android:layout_marginTop="8dp" />
 
-        <TextView
-            android:id="@+id/device_id_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:textColor="@android:color/black"
-            android:textSize="20sp"
-            tools:text="Id 123456" />
-
-        <TextView
-            android:id="@+id/battery_level_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:textColor="@android:color/black"
-            android:textSize="20sp"
-            tools:text="Battery level: 80%" />
-
-        <TextView
-            android:id="@+id/fw_version_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:textColor="@android:color/black"
-            android:textSize="20sp"
-            tools:text="Firmware: 3.1.1" />
-    </LinearLayout>
-
-    <LinearLayout
-        android:id="@+id/hr_view_hr_and_rr"
-        android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/rr_value_label"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintBottom_toTopOf="@id/hr_view_plot"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/hr_view_heading">
-
-        <TextView
-            android:id="@+id/hr_value_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
-            android:textAlignment="center"
-            android:textColor="#C00000"
-            android:textSize="30sp"
-            tools:text="100" />
-
-        <TextView
-            android:id="@+id/rr_value_label"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textAlignment="center"
-            android:textColor="@android:color/holo_blue_dark"
-            android:textSize="16sp"
-            tools:text="(1002ms, 1009ms)" />
-    </LinearLayout>
+        android:layout_marginTop="8dp" />
 
     <com.androidplot.xy.XYPlot
-        android:id="@+id/hr_view_plot"
-        style="@style/FullScreenGraph"
-        android:layout_width="fill_parent"
-        android:layout_height="304dp"
-        android:layout_marginTop="345dp"
-        app:backgroundColor="@color/colorAccent"
-        app:graphBackgroundColor="@color/colorAccent"
-        app:graphMarginBottom="12dp"
-        app:graphMarginLeft="30dp"
-        app:graphMarginRight="5dp"
-        app:graphMarginTop="20dp"
-        app:gridBackgroundColor="@color/colorAccent"
-        app:gridInsetLeft="25dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:lineLabels="left"
-        app:rangeTitle="@string/hr_range_title"
-        app:rangeTitleTextColor="@android:color/black"
-        app:rangeTitleTextSize="12dp"
-        app:renderMode="use_background_thread"
-        app:title="@string/hr_title"
-        app:titleTextColor="@android:color/black"
-        app:titleTextSize="15dp" />
+        android:id="@+id/plot"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="16dp"
+        android:layout_weight="1" />
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+</LinearLayout>
